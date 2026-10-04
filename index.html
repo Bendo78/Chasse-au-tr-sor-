@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16393d">
+<title>Chasse au trésor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Lora:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ============================================================
+   CONFIGURATION
+   Il ne reste qu'une valeur à coller : l'adresse du projet
+   (Supabase > Project Settings > API > Project URL),
+   du type https://abcdefgh.supabase.co
+   ============================================================ */
+const SUPABASE_URL = "COLLE_ICI_TON_URL";
+const SUPABASE_KEY = "sb_publishable_9ha9xdiWMEwpNryFw84mYA_7l3FRBm4";
+</script>
+<style>
+:root {
+  --nuit: #0d2528;
+  --nuit-2: #16393d;
+  --parchemin: #f2e4c6;
+  --parchemin-2: #e6d2a6;
+  --encre: #2b1d0e;
+  --encre-douce: #6b563a;
+  --or: #c9972b;
+  --or-clair: #e8c66a;
+  --oui: #2f6b4f;
+  --non: #a8382b;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { height: 100%; -webkit-text-size-adjust: 100%; background: var(--nuit); }
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  font-family: "Lora", Georgia, serif;
+  font-size: 17px;
+  color: var(--encre);
+  background:
+    radial-gradient(ellipse at 50% -10%, #24575c 0%, transparent 60%),
+    linear-gradient(180deg, var(--nuit-2), var(--nuit));
+  background-attachment: fixed;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding:
+    calc(10px + env(safe-area-inset-top))
+    calc(14px + env(safe-area-inset-right))
+    calc(14px + env(safe-area-inset-bottom))
+    calc(14px + env(safe-area-inset-left));
+  overflow-x: hidden;
+}
+button { font: inherit; cursor: pointer; border: none; border-radius: 10px; touch-action: manipulation; }
+button:disabled { opacity: .55; }
+input:focus, textarea:focus, button:focus-visible { outline: 3px solid var(--or); outline-offset: 2px; }
+
+/* Barre du haut */
+.barre { width: 100%; max-width: 520px; display: flex; justify-content: flex-end; min-height: 40px; }
+.btn-admin {
+  background: rgba(232,198,106,.1);
+  color: var(--or-clair);
+  border: 1.5px solid rgba(232,198,106,.55);
+  border-radius: 999px;
+  font-size: .85rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  padding: 9px 16px;
+  min-height: 40px;
+}
+.btn-admin:active { background: rgba(232,198,106,.25); }
+
+header { text-align: center; margin: 2px 0 14px; }
+.boussole { width: 46px; height: 46px; display: block; margin: 0 auto 4px; animation: tangue 6s ease-in-out infinite; }
+@keyframes tangue { 0%,100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } }
+h1 {
+  font-family: "Pirata One", "Lora", serif;
+  font-weight: 400;
+  font-size: clamp(2.3rem, 11.5vw, 3.6rem);
+  line-height: 1;
+  margin: 0;
+  color: var(--or-clair);
+  text-shadow: 0 2px 0 #7a5a12, 0 6px 18px rgba(0,0,0,.45);
+  letter-spacing: .02em;
+}
+
+/* Carte parchemin : occupe tout l'espace restant sur téléphone */
+.carte {
+  flex: 1;
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(139,94,32,.18), transparent 40%),
+    radial-gradient(circle at 90% 95%, rgba(139,94,32,.22), transparent 45%),
+    linear-gradient(160deg, var(--parchemin), var(--parchemin-2));
+  border-radius: 16px;
+  padding: 8px;
+  box-shadow: 0 18px 50px rgba(0,0,0,.5);
+}
+.carte-int {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border: 2px dashed rgba(107,86,58,.55);
+  border-radius: 10px;
+  padding: 20px 16px;
+}
+.vue { display: none; }
+.vue.active { flex: 1; display: flex; flex-direction: column; animation: apparait .3s ease; }
+.vue.milieu { justify-content: center; }
+@keyframes apparait { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+h2 { font-family: "Pirata One", serif; font-weight: 400; font-size: 1.8rem; margin: 0 0 10px; }
+p { line-height: 1.5; margin: 0 0 14px; }
+.centre { text-align: center; }
+.discret { color: var(--encre-douce); font-size: .92rem; }
+label { display: block; font-weight: 600; margin-bottom: 6px; }
+input, textarea {
+  width: 100%;
+  font: inherit;
+  font-size: 17px; /* >= 16px : pas de zoom automatique sur iPhone */
+  color: var(--encre);
+  background: rgba(255,255,255,.6);
+  border: 1.5px solid var(--encre-douce);
+  border-radius: 10px;
+  padding: 13px 14px;
+  margin-bottom: 14px;
+}
+textarea { min-height: 110px; resize: vertical; }
+.btn {
+  display: block; width: 100%;
+  background: var(--encre); color: var(--parchemin);
+  font-weight: 600; font-size: 1.05rem;
+  padding: 15px 18px; min-height: 52px;
+}
+.btn:active:not(:disabled) { background: #46311a; }
+.btn.clair { background: transparent; color: var(--encre); border: 1.5px solid var(--encre-douce); }
+.btn.clair:active:not(:disabled) { background: rgba(43,29,14,.1); }
+.message { background: rgba(168,56,43,.12); border-left: 4px solid var(--non); padding: 10px 12px; border-radius: 4px; margin-bottom: 14px; display: none; }
+.message.visible { display: block; }
+
+/* Question */
+.etape { font-size: .8rem; letter-spacing: .14em; text-transform: uppercase; color: var(--encre-douce); text-align: center; }
+.piste { height: 0; border-top: 3px dashed rgba(107,86,58,.4); margin: 14px 10px 0 0; position: relative; }
+.piste-fait { position: absolute; top: -3px; left: 0; height: 0; border-top: 3px dashed var(--non); transition: width .4s ease; }
+.piste-x { position: absolute; right: -10px; top: -17px; font-family: "Pirata One", serif; font-size: 1.6rem; color: var(--non); }
+.question {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center;
+  font-size: clamp(1.45rem, 6.6vw, 1.95rem);
+  font-weight: 600; text-align: center; line-height: 1.3;
+  margin: 0; padding: 22px 2px;
+  overflow-wrap: anywhere;
+}
+.choix { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.choix button {
+  font-family: "Pirata One", serif; font-size: 2.2rem; color: #fff8e6;
+  min-height: 92px; padding: 16px 8px;
+  border-radius: 14px;
+  box-shadow: 0 6px 0 rgba(0,0,0,.28);
+  transition: transform .08s, box-shadow .08s;
+}
+.choix button:active:not(:disabled) { transform: translateY(5px); box-shadow: 0 1px 0 rgba(0,0,0,.28); }
+.b-oui { background: var(--oui); }
+.b-non { background: var(--non); }
+
+/* Fin */
+.coffre { width: 130px; display: block; margin: 0 auto 4px; }
+.fini { font-family: "Pirata One", serif; font-size: clamp(4.5rem, 26vw, 7rem); text-align: center; color: var(--non); line-height: 1; }
+
+/* Admin */
+.compteur { background: rgba(43,29,14,.08); border-radius: 10px; padding: 10px 14px; margin-bottom: 4px; }
+.compteur b { font-size: 1.3rem; }
+.q-ligne { border-bottom: 1.5px dashed rgba(107,86,58,.45); padding: 16px 0; }
+.q-tete { display: flex; gap: 8px; align-items: flex-start; }
+.q-num { font-family: "Pirata One", serif; font-size: 1.5rem; color: var(--or); min-width: 1.3em; line-height: 1.1; -webkit-text-stroke: .5px #7a5a12; }
+.q-texte { flex: 1; min-width: 0; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.q-scores { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0 8px; }
+.score { border-radius: 10px; padding: 8px 12px; color: #fff8e6; display: flex; align-items: baseline; justify-content: space-between; font-variant-numeric: tabular-nums; }
+.score.oui { background: var(--oui); }
+.score.non { background: var(--non); }
+.score b { font-size: 1.7rem; line-height: 1.1; }
+.score span { font-size: .85rem; opacity: .9; }
+.jauge { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: rgba(43,29,14,.12); }
+.jauge i { display: block; height: 100%; transition: width .4s ease; }
+.jauge .j-oui { background: var(--oui); }
+.jauge .j-non { background: var(--non); }
+.q-outils { display: flex; gap: 6px; justify-content: flex-end; margin-top: 10px; }
+.q-outils button { background: transparent; border: 1.5px solid var(--encre-douce); color: var(--encre); width: 44px; height: 40px; font-size: 1rem; }
+.q-outils button:active:not(:disabled) { background: rgba(43,29,14,.12); }
+details { margin-top: 18px; }
+summary { font-weight: 600; padding: 12px 0; cursor: pointer; }
+code { background: rgba(43,29,14,.1); padding: 1px 5px; border-radius: 4px; font-size: .9em; overflow-wrap: anywhere; }
+
+/* Grand écran : la carte n'a pas besoin de remplir toute la hauteur */
+@media (min-width: 700px) and (min-height: 760px) {
+  body { padding-top: 24px; }
+  .carte { flex: 0 1 auto; min-height: 480px; }
+  .boussole { width: 60px; height: 60px; }
+}
+@media (max-height: 600px) {
+  .boussole { display: none; }
+  header { margin-bottom: 8px; }
+  .choix button { min-height: 68px; font-size: 1.8rem; }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="barre"><button class="btn-admin" id="btn-admin" type="button">Admin</button></div>
+
+<header>
+  <svg class="boussole" viewBox="0 0 64 64" aria-hidden="true">
+    <circle cx="32" cy="32" r="29" fill="none" stroke="#e8c66a" stroke-width="2.5"/>
+    <circle cx="32" cy="32" r="23" fill="none" stroke="#e8c66a" stroke-width="1" stroke-dasharray="2 4"/>
+    <polygon points="32,7 37,32 32,36 27,32" fill="#a8382b"/>
+    <polygon points="32,57 37,32 32,28 27,32" fill="#f2e4c6"/>
+    <polygon points="7,32 32,27 36,32 32,37" fill="#e8c66a" opacity=".75"/>
+    <polygon points="57,32 32,27 28,32 32,37" fill="#e8c66a" opacity=".75"/>
+    <circle cx="32" cy="32" r="3" fill="#2b1d0e"/>
+  </svg>
+  <h1>Chasse au trésor</h1>
+</header>
+
+<main class="carte">
+  <div class="carte-int">
+
+    <section class="vue milieu active" id="vue-chargement">
+      <p class="centre discret">Déroulement de la carte…</p>
+    </section>
+
+    <section class="vue milieu" id="vue-config">
+      <h2>Presque prêt</h2>
+      <p>Il manque l'adresse du projet Supabase. Dans <code>index.html</code>, tout en haut, remplace <code>COLLE_ICI_TON_URL</code> par l'adresse de ton projet (du type <code>https://abcdefgh.supabase.co</code>).</p>
+    </section>
+
+    <section class="vue milieu" id="vue-erreur">
+      <h2 class="centre">Oups</h2>
+      <p class="centre">Connexion impossible. Vérifie ta connexion internet.</p>
+      <button class="btn" id="btn-reessayer" type="button">Réessayer</button>
+    </section>
+
+    <section class="vue milieu" id="vue-vide">
+      <h2 class="centre">Patience…</h2>
+      <p class="centre">Aucune question n'est encore prête.</p>
+      <button class="btn clair" id="btn-recharger" type="button">Actualiser</button>
+    </section>
+
+    <!-- Question : affichée directement à l'ouverture -->
+    <section class="vue" id="vue-quiz">
+      <div class="etape" id="etape"></div>
+      <div class="piste"><div class="piste-fait" id="piste-fait"></div><span class="piste-x">✕</span></div>
+      <p class="question" id="question"></p>
+      <div class="message" id="msg-quiz"></div>
+      <div class="choix">
+        <button class="b-oui" id="btn-oui" type="button">Oui</button>
+        <button class="b-non" id="btn-non" type="button">Non</button>
+      </div>
+    </section>
+
+    <section class="vue milieu" id="vue-fin">
+      <svg class="coffre" viewBox="0 0 120 90" aria-hidden="true">
+        <ellipse cx="60" cy="38" rx="34" ry="10" fill="#e8c66a"/>
+        <circle cx="46" cy="34" r="6" fill="#c9972b"/><circle cx="60" cy="30" r="7" fill="#e8c66a" stroke="#c9972b" stroke-width="1.5"/><circle cx="75" cy="34" r="6" fill="#c9972b"/>
+        <path d="M18 22 Q60 -8 102 22 L98 34 Q60 10 22 34 Z" fill="#6b4520" stroke="#2b1d0e" stroke-width="2.5"/>
+        <rect x="18" y="38" width="84" height="44" rx="5" fill="#8a5a2b" stroke="#2b1d0e" stroke-width="2.5"/>
+        <rect x="18" y="52" width="84" height="7" fill="#c9972b" stroke="#2b1d0e" stroke-width="1.5"/>
+        <rect x="53" y="48" width="14" height="16" rx="2" fill="#e8c66a" stroke="#2b1d0e" stroke-width="2"/>
+        <circle cx="60" cy="55" r="2" fill="#2b1d0e"/>
+      </svg>
+      <div class="fini">Fini</div>
+    </section>
+
+    <!-- Code admin -->
+    <section class="vue milieu" id="vue-code">
+      <h2>Espace admin</h2>
+      <div class="message" id="msg-code"></div>
+      <form id="form-code">
+        <label for="code">Code</label>
+        <input type="password" id="code" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+        <button class="btn" type="submit" id="btn-code">Entrer</button>
+      </form>
+    </section>
+
+    <!-- Résultats admin -->
+    <section class="vue" id="vue-admin">
+      <h2>Résultats</h2>
+      <div class="message" id="msg-admin"></div>
+      <div class="compteur"><b id="nb-participants">0</b> participant(s) · mise à jour automatique</div>
+      <div id="liste-questions"></div>
+
+      <details>
+        <summary>Ajouter des questions</summary>
+        <form id="form-question">
+          <label for="nouvelles" class="discret">Une question par ligne</label>
+          <textarea id="nouvelles" placeholder="Le trésor est-il caché près de l'eau ?" required></textarea>
+          <button class="btn" type="submit">Ajouter</button>
+        </form>
+      </details>
+      <details>
+        <summary>Remise à zéro</summary>
+        <p class="discret">Efface toutes les réponses reçues. Les questions sont conservées.</p>
+        <button class="btn clair" id="btn-vider" type="button">Effacer les réponses</button>
+      </details>
+    </section>
+
+  </div>
+</main>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  let vueCourante = "vue-chargement";
+
+  function montrer(id) {
+    document.querySelectorAll(".vue").forEach((v) => v.classList.remove("active"));
+    $(id).classList.add("active");
+    vueCourante = id;
+    const admin = id === "vue-admin" || id === "vue-code";
+    $("btn-admin").textContent = admin ? "← Retour au jeu" : "Admin";
+    window.scrollTo(0, 0);
+  }
+  function message(id, texte) {
+    const el = $(id);
+    el.textContent = texte || "";
+    el.classList.toggle("visible", !!texte);
+  }
+
+  if (!/^https?:\/\//.test(SUPABASE_URL) || !window.supabase) {
+    montrer("vue-config");
+    $("btn-admin").style.display = "none";
+    return;
+  }
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  /* ---------- Identifiant de l'appareil ----------
+     Enregistré dans le téléphone (stockage local + cookie de secours) :
+     si la personne ferme son navigateur, elle reprend où elle en était. */
+  function lire(cle, defaut) {
+    try { const v = localStorage.getItem(cle); return v === null ? defaut : JSON.parse(v); }
+    catch (e) { return defaut; }
+  }
+  function ecrire(cle, valeur) {
+    try { localStorage.setItem(cle, JSON.stringify(valeur)); } catch (e) {}
+  }
+  function lireCookie(nom) {
+    try { const m = document.cookie.match(new RegExp("(?:^|; )" + nom + "=([^;]*)")); return m ? decodeURIComponent(m[1]) : null; }
+    catch (e) { return null; }
+  }
+  function ecrireCookie(nom, valeur) {
+    try { document.cookie = nom + "=" + encodeURIComponent(valeur) + "; max-age=31536000; path=/; SameSite=Lax"; } catch (e) {}
+  }
+  function nouvelId() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = Math.random() * 16 | 0;
+      return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  }
+  const formatId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  let participantId = lire("cat_participant", null) || lireCookie("cat_participant");
+  if (!participantId || !formatId.test(participantId)) participantId = nouvelId();
+  ecrire("cat_participant", participantId);
+  ecrireCookie("cat_participant", participantId);
+  let repondues = lire("cat_repondues", []);
+  if (!Array.isArray(repondues)) repondues = [];
+
+  /* ---------- Jeu ---------- */
+  let questions = [];
+  let courante = null;
+
+  async function demarrerJeu() {
+    montrer("vue-chargement");
+    let q, r;
+    try {
+      [q, r] = await Promise.all([
+        sb.from("questions").select("id, texte").order("position").order("id"),
+        sb.rpc("mes_reponses", { pid: participantId })
+      ]);
+    } catch (e) { montrer("vue-erreur"); return; }
+    if (q.error) { montrer("vue-erreur"); return; }
+    questions = q.data || [];
+    // Ce que le serveur a déjà reçu de cet appareil fait foi
+    if (!r.error && Array.isArray(r.data)) {
+      r.data.forEach((id) => { if (!repondues.includes(id)) repondues.push(id); });
+      ecrire("cat_repondues", repondues);
+    }
+    afficherSuivante();
+  }
+
+  function afficherSuivante() {
+    if (questions.length === 0) { montrer("vue-vide"); return; }
+    const restantes = questions.filter((q) => !repondues.includes(q.id));
+    if (restantes.length === 0) { montrer("vue-fin"); return; }
+    courante = restantes[0];
+    const faites = questions.length - restantes.length;
+    $("etape").textContent = "Question " + (faites + 1) + " sur " + questions.length;
+    $("piste-fait").style.width = (faites / questions.length * 100) + "%";
+    $("question").textContent = courante.texte;
+    message("msg-quiz", "");
+    $("btn-oui").disabled = $("btn-non").disabled = false;
+    montrer("vue-quiz");
+  }
+
+  async function repondre(valeur) {
+    if (!courante || $("btn-oui").disabled) return;
+    $("btn-oui").disabled = $("btn-non").disabled = true;
+    let error = null;
+    try {
+      ({ error } = await sb.from("reponses").insert({
+        question_id: courante.id, participant_id: participantId, reponse: valeur
+      }));
+    } catch (e) { error = e; }
+    // 23505 = cet appareil a déjà répondu à cette question : on passe à la suite
+    if (error && error.code !== "23505") {
+      message("msg-quiz", "Réponse non envoyée. Vérifie ta connexion et réessaie.");
+      $("btn-oui").disabled = $("btn-non").disabled = false;
+      return;
+    }
+    repondues.push(courante.id);
+    ecrire("cat_repondues", repondues);
+    afficherSuivante();
+  }
+
+  $("btn-oui").addEventListener("click", () => repondre(true));
+  $("btn-non").addEventListener("click", () => repondre(false));
+  $("btn-recharger").addEventListener("click", demarrerJeu);
+  $("btn-reessayer").addEventListener("click", demarrerJeu);
+
+  /* ---------- Admin ---------- */
+  let codeAdmin = null;
+  let minuteur = null;
+  let adminQuestions = [];
+
+  $("btn-admin").addEventListener("click", () => {
+    if (vueCourante === "vue-admin" || vueCourante === "vue-code") {
+      clearInterval(minuteur);
+      demarrerJeu();
+    } else if (codeAdmin) {
+      ouvrirAdmin();
+    } else {
+      message("msg-code", "");
+      $("code").value = "";
+      montrer("vue-code");
+    }
+  });
+
+  // Renvoie "ok", "code" (code refusé) ou "reseau"
+  async function chargerTableau() {
+    let rep;
+    try { rep = await sb.rpc("admin_tableau", { code: codeAdmin }); }
+    catch (e) { return "reseau"; }
+    if (rep.error) return /CODE_INCORRECT/.test(rep.error.message || "") ? "code" : "reseau";
+    const t = rep.data || {};
+    adminQuestions = t.questions || [];
+    $("nb-participants").textContent = t.participants || 0;
+    dessinerListe();
+    return "ok";
+  }
+
+  async function ouvrirAdmin() {
+    clearInterval(minuteur);
+    montrer("vue-admin");
+    const etat = await chargerTableau();
+    message("msg-admin", etat === "ok" ? "" : "Lecture impossible. Vérifie ta connexion.");
+    minuteur = setInterval(async () => {
+      if (vueCourante !== "vue-admin") { clearInterval(minuteur); return; }
+      await chargerTableau();
+    }, 5000);
+  }
+
+  $("form-code").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    message("msg-code", "");
+    $("btn-code").disabled = true;
+    codeAdmin = $("code").value.trim();
+    const etat = await chargerTableau();
+    $("btn-code").disabled = false;
+    if (etat === "ok") { $("code").value = ""; ouvrirAdmin(); return; }
+    codeAdmin = null;
+    message("msg-code", etat === "code" ? "Code incorrect." : "Connexion impossible. Réessaie.");
+  });
+
+  function dessinerListe() {
+    const liste = $("liste-questions");
+    liste.textContent = "";
+    if (adminQuestions.length === 0) {
+      const p = document.createElement("p");
+      p.className = "discret centre";
+      p.style.marginTop = "16px";
+      p.textContent = "Aucune question pour l'instant.";
+      liste.appendChild(p);
+      return;
+    }
+    adminQuestions.forEach((q, i) => {
+      const oui = Number(q.oui) || 0, non = Number(q.non) || 0, total = oui + non;
+      const pOui = total ? Math.round(oui / total * 100) : 0;
+
+      const ligne = document.createElement("div"); ligne.className = "q-ligne";
+      const tete = document.createElement("div"); tete.className = "q-tete";
+      const num = document.createElement("div"); num.className = "q-num"; num.textContent = i + 1;
+      const texte = document.createElement("div"); texte.className = "q-texte"; texte.textContent = q.texte;
+      tete.append(num, texte);
+
+      const scores = document.createElement("div"); scores.className = "q-scores";
+      scores.append(score("oui", "Oui", oui, total ? pOui : null), score("non", "Non", non, total ? 100 - pOui : null));
+
+      const jauge = document.createElement("div"); jauge.className = "jauge";
+      const jo = document.createElement("i"); jo.className = "j-oui"; jo.style.width = (total ? oui / total * 100 : 0) + "%";
+      const jn = document.createElement("i"); jn.className = "j-non"; jn.style.width = (total ? non / total * 100 : 0) + "%";
+      jauge.append(jo, jn);
+
+      const outils = document.createElement("div"); outils.className = "q-outils";
+      outils.append(
+        bouton("↑", "Monter", i === 0, () => deplacer(i, -1)),
+        bouton("↓", "Descendre", i === adminQuestions.length - 1, () => deplacer(i, 1)),
+        bouton("✕", "Supprimer", false, () => supprimer(q))
+      );
+
+      ligne.append(tete, scores, jauge, outils);
+      liste.appendChild(ligne);
+    });
+  }
+  function score(classe, nom, n, pourcent) {
+    const d = document.createElement("div"); d.className = "score " + classe;
+    const s = document.createElement("span"); s.textContent = nom + (pourcent === null ? "" : " · " + pourcent + " %");
+    const b = document.createElement("b"); b.textContent = n;
+    d.append(s, b);
+    return d;
+  }
+  function bouton(symbole, titre, inactif, action) {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = symbole; b.title = titre; b.setAttribute("aria-label", titre);
+    b.disabled = inactif;
+    b.addEventListener("click", action);
+    return b;
+  }
+
+  async function action(nom, params, echec) {
+    let error = null;
+    try { ({ error } = await sb.rpc(nom, Object.assign({ code: codeAdmin }, params))); }
+    catch (e) { error = e; }
+    message("msg-admin", error ? echec : "");
+    await chargerTableau();
+    return !error;
+  }
+  function deplacer(i, sens) {
+    const ids = adminQuestions.map((q) => q.id);
+    const j = i + sens;
+    if (j < 0 || j >= ids.length) return;
+    const tmp = ids[i]; ids[i] = ids[j]; ids[j] = tmp;
+    action("admin_ordonner", { ids: ids }, "Déplacement impossible.");
+  }
+  function supprimer(q) {
+    if (!confirm("Supprimer cette question et ses réponses ?\n\n« " + q.texte + " »")) return;
+    action("admin_supprimer", { qid: q.id }, "Suppression impossible.");
+  }
+  $("form-question").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const lignes = $("nouvelles").value.split("\n").map((l) => l.trim()).filter(Boolean);
+    if (lignes.length === 0) return;
+    if (await action("admin_ajouter", { textes: lignes }, "Ajout impossible.")) $("nouvelles").value = "";
+  });
+  $("btn-vider").addEventListener("click", () => {
+    if (!confirm("Effacer toutes les réponses ? Les questions sont conservées.")) return;
+    action("admin_vider", {}, "Effacement impossible.");
+  });
+
+  demarrerJeu();
+})();
+</script>
+</body>
+</html>
