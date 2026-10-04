@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16393d">
+<meta name="color-scheme" content="only light">
+<meta name="darkreader-lock">
 <title>Chasse au trésor</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,6 +23,7 @@ const SUPABASE_KEY = "sb_publishable_9ha9xdiWMEwpNryFw84mYA_7l3FRBm4";
 </script>
 <style>
 :root {
+  color-scheme: only light;
   --nuit: #0d2528;
   --nuit-2: #16393d;
   --parchemin: #f2e4c6;
@@ -103,6 +106,7 @@ h1 {
   box-shadow: 0 18px 50px rgba(0,0,0,.5);
 }
 .carte-int {
+  color: #000;
   flex: 1;
   min-width: 0;
   display: flex;
@@ -151,6 +155,8 @@ textarea { min-height: 110px; resize: vertical; }
 .piste-fait { position: absolute; top: -3px; left: 0; height: 0; border-top: 3px dashed var(--non); transition: width .4s ease; }
 .piste-x { position: absolute; right: -10px; top: -17px; font-family: "Pirata One", serif; font-size: 1.6rem; color: var(--non); }
 .question {
+  color: #000 !important;
+  -webkit-text-fill-color: #000;
   flex: 1;
   display: flex; align-items: center; justify-content: center;
   font-size: clamp(1.45rem, 6.6vw, 1.95rem);
