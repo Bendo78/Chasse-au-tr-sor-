@@ -389,7 +389,7 @@ code { background: rgba(43,29,14,.1); padding: 1px 5px; border-radius: 4px; font
     questions = q.data || [];
     // Ce que le serveur a déjà reçu de cet appareil fait foi
     if (!r.error && Array.isArray(r.data)) {
-      r.data.forEach((id) => { if (!repondues.includes(id)) repondues.push(id); });
+      repondues = r.data.slice(); // après une remise à zéro, l'appareil repart du début
       ecrire("cat_repondues", repondues);
     }
     afficherSuivante();
