@@ -197,6 +197,8 @@ textarea { min-height: 110px; resize: vertical; }
 .jauge i { display: block; height: 100%; transition: width .4s ease; }
 .jauge .j-oui { background: var(--oui); }
 .jauge .j-non { background: var(--non); }
+.q-noms { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; font-size: .92rem; line-height: 1.4; overflow-wrap: anywhere; }
+.q-noms div { padding: 0 4px; min-width: 0; }
 .q-outils { display: flex; gap: 6px; justify-content: flex-end; margin-top: 10px; }
 .q-outils button { background: transparent; border: 1.5px solid var(--encre-douce); color: var(--encre); width: 44px; height: 40px; font-size: 1rem; }
 .q-outils button:active:not(:disabled) { background: rgba(43,29,14,.12); }
@@ -259,7 +261,17 @@ code { background: rgba(43,29,14,.1); padding: 1px 5px; border-radius: 4px; font
       <button class="btn clair" id="btn-recharger" type="button">Actualiser</button>
     </section>
 
-    <!-- Question : affichée directement à l'ouverture -->
+    <!-- Prénom : demandé une seule fois, avant la première question -->
+    <section class="vue milieu" id="vue-prenom">
+      <h2>Qui es-tu ?</h2>
+      <form id="form-prenom">
+        <label for="prenom">Ton prénom</label>
+        <input type="text" id="prenom" maxlength="30" autocomplete="given-name" autocapitalize="words" required>
+        <button class="btn" type="submit">Commencer</button>
+      </form>
+    </section>
+
+    <!-- Question -->
     <section class="vue" id="vue-quiz">
       <div class="etape" id="etape"></div>
       <div class="piste"><div class="piste-fait" id="piste-fait"></div><span class="piste-x">✕</span></div>
@@ -375,6 +387,8 @@ code { background: rgba(43,29,14,.1); padding: 1px 5px; border-radius: 4px; font
   if (!participantId || !formatId.test(participantId)) participantId = nouvelId();
   ecrire("cat_participant", participantId);
   ecrireCookie("cat_participant", participantId);
+  let pseudo = lire("cat_pseudo", "");
+  if (typeof pseudo !== "string") pseudo = "";
   let repondues = lire("cat_repondues", []);
   if (!Array.isArray(repondues)) repondues = [];
 
@@ -405,6 +419,7 @@ code { background: rgba(43,29,14,.1); padding: 1px 5px; border-radius: 4px; font
     if (questions.length === 0) { montrer("vue-vide"); return; }
     const restantes = questions.filter((q) => !repondues.includes(q.id));
     if (restantes.length === 0) { montrer("vue-fin"); return; }
+    if (!pseudo) { montrer("vue-prenom"); return; }
     courante = restantes[0];
     const faites = questions.length - restantes.length;
     $("etape").textContent = "Question " + (faites + 1) + " sur " + questions.length;
@@ -421,7 +436,7 @@ code { background: rgba(43,29,14,.1); padding: 1px 5px; border-radius: 4px; font
     let error = null;
     try {
       ({ error } = await sb.from("reponses").insert({
-        question_id: courante.id, participant_id: participantId, reponse: valeur
+        question_id: courante.id, participant_id: participantId, pseudo: pseudo, reponse: valeur
       }));
     } catch (e) { error = e; }
     // 23505 = cet appareil a déjà répondu à cette question : on passe à la suite
@@ -435,6 +450,14 @@ code { background: rgba(43,29,14,.1); padding: 1px 5px; border-radius: 4px; font
     afficherSuivante();
   }
 
+  $("form-prenom").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const v = $("prenom").value.trim().slice(0, 30);
+    if (!v) return;
+    pseudo = v;
+    ecrire("cat_pseudo", pseudo);
+    afficherSuivante();
+  });
   $("btn-oui").addEventListener("click", () => repondre(true));
   $("btn-non").addEventListener("click", () => repondre(false));
   $("btn-recharger").addEventListener("click", demarrerJeu);
@@ -530,9 +553,17 @@ code { background: rgba(43,29,14,.1); padding: 1px 5px; border-radius: 4px; font
         bouton("✕", "Supprimer", false, () => supprimer(q))
       );
 
-      ligne.append(tete, scores, jauge, outils);
+      const noms = document.createElement("div"); noms.className = "q-noms";
+      noms.append(listeNoms(q.oui_noms), listeNoms(q.non_noms));
+
+      ligne.append(tete, scores, jauge, noms, outils);
       liste.appendChild(ligne);
     });
+  }
+  function listeNoms(liste) {
+    const d = document.createElement("div");
+    d.textContent = Array.isArray(liste) && liste.length ? liste.join(", ") : "—";
+    return d;
   }
   function score(classe, nom, n, pourcent) {
     const d = document.createElement("div"); d.className = "score " + classe;
